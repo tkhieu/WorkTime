@@ -15,13 +15,15 @@
     "lint:fix": "eslint 'src/**/*.ts' --fix"
   },
   "dependencies": {
+    "@hono/zod-validator": "^0.2.0",
     "@worktime/shared": "workspace:*",
-    "hono": "^3.12.8"
+    "hono": "^3.12.8",
+    "zod": "^3.22.4"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20240129.0",
     "@types/node": "^20.11.5",
     "typescript": "^5.3.3",
-    "wrangler": "^3.24.0"
+    "wrangler": "^4.55.0"
   }
 }

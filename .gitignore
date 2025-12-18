@@ -1,3 +1,50 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Build outputs
+dist/
+build/
+*.tsbuildinfo
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Temporary files
+.tmp/
+.cache/
+
+# Wrangler
+.wrangler/
+.dev.vars
+
+# Test coverage
+coverage/
+
+# Chrome extension
+packages/extension/dist/
+*.crx
+*.pem
 
 # Claude Flow generated files
 .claude/settings.local.json
@@ -26,3 +73,4 @@ claude-flow
 # Removed Windows wrapper files per user request
 hive-mind-prompt-*.txt
 .claude
+node_modules

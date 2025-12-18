@@ -1,0 +1,31 @@
+{
+  "manifest_version": 3,
+  "name": "WorkTime - PR Tracker",
+  "version": "0.1.0",
+  "description": "Track time spent reviewing GitHub Pull Requests",
+  "permissions": ["tabs", "storage", "idle", "alarms", "identity"],
+  "host_permissions": ["https://github.com/*/*"],
+  "background": {
+    "service_worker": "background/service-worker.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://github.com/*/*/pull/*"],
+      "js": ["content/pr-detector.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "action": {
+    "default_popup": "popup/popup.html",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  },
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  }
+}

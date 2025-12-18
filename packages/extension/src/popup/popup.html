@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>WorkTime - PR Review Tracker</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>WorkTime</h1>
+      <p class="subtitle">PR Review Tracker</p>
+    </header>
+
+    <main>
+      <div id="status" class="status inactive">Not tracking</div>
+
+      <div class="current-pr">
+        <label>Current PR:</label>
+        <div id="current-pr" class="pr-title">No active PR review</div>
+      </div>
+
+      <div class="timer-container">
+        <div id="timer" class="timer">0m 0s</div>
+      </div>
+
+      <div class="controls">
+        <button id="start-btn" class="btn btn-primary">Start Tracking</button>
+        <button id="stop-btn" class="btn btn-secondary" disabled>Stop Tracking</button>
+      </div>
+
+      <div class="stats">
+        <div class="stat-item">
+          <span class="stat-label">Today:</span>
+          <span id="today-time" class="stat-value">0m</span>
+        </div>
+        <div class="stat-item">
+          <span class="stat-label">This week:</span>
+          <span id="week-time" class="stat-value">0m</span>
+        </div>
+      </div>
+    </main>
+
+    <footer>
+      <a href="#" id="settings-link">Settings</a>
+      <a href="#" id="dashboard-link">Dashboard</a>
+    </footer>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>

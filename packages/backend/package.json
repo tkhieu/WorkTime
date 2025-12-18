@@ -1,0 +1,27 @@
+{
+  "name": "@worktime/backend",
+  "version": "0.1.0",
+  "private": true,
+  "description": "WorkTime Backend - Cloudflare Workers API",
+  "main": "src/index.ts",
+  "scripts": {
+    "dev": "wrangler dev",
+    "build": "tsc",
+    "build:dev": "tsc",
+    "deploy": "wrangler deploy",
+    "clean": "rm -rf dist",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint 'src/**/*.ts'",
+    "lint:fix": "eslint 'src/**/*.ts' --fix"
+  },
+  "dependencies": {
+    "@worktime/shared": "workspace:*",
+    "hono": "^3.12.8"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20240129.0",
+    "@types/node": "^20.11.5",
+    "typescript": "^5.3.3",
+    "wrangler": "^3.24.0"
+  }
+}

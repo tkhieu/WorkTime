@@ -8,74 +8,101 @@
 ## Overview
 
 **Date:** 2025-12-18
-**Description:** Initialize project structure, TypeScript tooling, ESLint, build system, and manifest.json configuration for Manifest V3 Chrome Extension.
+**Description:** Initialize monorepo structure with pnpm workspaces, TypeScript tooling, ESLint, build system for Chrome Extension (MV3) and Cloudflare Workers backend. Establish shared types package.
 **Priority:** High
 **Status:** Not Started
-**Estimated Time:** 4-6 hours
+**Estimated Time:** 6-8 hours
 
 ## Key Insights from Research
 
-- **MV3 Requirements:** Service worker background, no persistent background pages
-- **Build Tooling:** Need TypeScript compilation + bundling for service workers
-- **Storage First:** All state in chrome.storage, no DOM access in background
-- **Manifest Permissions:** tabs, storage, idle, alarms, identity (for OAuth)
+**Extension (MV3):**
+- Service worker background, no persistent pages
+- TypeScript + bundling for MV3 compatibility
+- Manifest permissions: tabs, storage, idle, alarms, identity
+
+**Backend (Cloudflare):**
+- Workers with Hono.js framework
+- D1 for SQLite storage, KV for tokens
+- Wrangler for development and deployment
+
+**Monorepo:**
+- pnpm workspaces for shared types
+- Separate build pipelines per package
+- Shared TypeScript config with overrides
 
 ## Requirements
 
 ### Functional Requirements
-- TypeScript project with strict type checking
+- pnpm workspace monorepo with 3 packages (extension, backend, shared)
+- TypeScript with strict mode across all packages
 - ESLint + Prettier for code quality
-- Build script to compile TS → JS and bundle for Chrome
-- Manifest V3 configuration with correct permissions
-- Development vs production build modes
+- Extension build with Webpack for MV3 bundling
+- Backend build with Wrangler for Cloudflare Workers
+- Shared types package consumed by both extension and backend
+- Development vs production build modes per package
 
 ### Non-Functional Requirements
-- Fast incremental builds (<5s for development)
-- Hot reload support for development
-- Source maps for debugging
-- Type-safe extension APIs (@types/chrome)
+- Fast incremental builds (<5s per package)
+- Hot reload for extension development
+- Source maps for debugging all packages
+- Type-safe APIs (@types/chrome, Hono types)
 
 ## Architecture
 
 ### Project Structure
 ```
-worktime-extension/
-├── src/
-│   ├── manifest.json          # MV3 manifest
-│   ├── background/
-│   │   ├── service-worker.ts  # Main service worker entry
-│   │   ├── storage-manager.ts # Storage abstraction layer
-│   │   └── alarm-manager.ts   # Periodic wake-ups
-│   ├── content/
-│   │   ├── pr-detector.ts     # GitHub PR detection
-│   │   └── visibility-tracker.ts # Page Visibility API
-│   ├── popup/
-│   │   ├── popup.html         # Popup UI
-│   │   ├── popup.ts           # Popup logic
-│   │   └── popup.css          # Styling
-│   ├── auth/
-│   │   ├── github-oauth.ts    # OAuth flow
-│   │   └── token-manager.ts   # Token storage/refresh
-│   ├── types/
-│   │   └── index.ts           # Shared TypeScript types
-│   └── utils/
-│       └── helpers.ts         # Shared utilities
-├── dist/                      # Build output (gitignored)
-├── tests/                     # Test files (Phase 07)
-├── package.json
-├── tsconfig.json
+worktime/
+├── packages/
+│   ├── extension/              # Chrome Extension
+│   │   ├── src/
+│   │   │   ├── manifest.json
+│   │   │   ├── background/
+│   │   │   ├── content/
+│   │   │   ├── popup/
+│   │   │   └── auth/
+│   │   ├── dist/               # Build output
+│   │   ├── tests/
+│   │   ├── package.json
+│   │   ├── tsconfig.json
+│   │   └── webpack.config.js
+│   ├── backend/                # Cloudflare Workers
+│   │   ├── src/
+│   │   │   ├── index.ts        # Hono.js app entry
+│   │   │   ├── routes/
+│   │   │   ├── middleware/
+│   │   │   └── db/
+│   │   ├── migrations/         # D1 migrations
+│   │   ├── tests/
+│   │   ├── package.json
+│   │   ├── tsconfig.json
+│   │   └── wrangler.toml
+│   └── shared/                 # Shared types
+│       ├── src/
+│       │   ├── types/
+│       │   └── utils/
+│       ├── package.json
+│       └── tsconfig.json
+├── package.json                # Root workspace
+├── pnpm-workspace.yaml
+├── tsconfig.base.json          # Base TS config
 ├── .eslintrc.json
 ├── .prettierrc
-├── webpack.config.js          # Build configuration
 └── README.md
 ```
 
 ### Technology Stack
-- **Language:** TypeScript 5.x
-- **Build Tool:** Webpack 5 (alternative: esbuild for faster builds)
-- **Linting:** ESLint + @typescript-eslint
-- **Formatting:** Prettier
-- **Types:** @types/chrome, @types/node
+**Extension:**
+- TypeScript 5.x + Webpack 5 for bundling
+- @types/chrome for type safety
+
+**Backend:**
+- TypeScript 5.x + Wrangler for Workers
+- Hono.js framework (14kB, edge-optimized)
+
+**Monorepo:**
+- pnpm workspaces for package management
+- Shared ESLint + Prettier configs
+- Shared base tsconfig.json
 
 ## Related Code Files
 

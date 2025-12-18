@@ -57,10 +57,10 @@ class AlarmManager {
       // Only update active sessions that haven't ended
       if (session.active && session.endTime === null) {
         // Calculate elapsed time since last update
-        const elapsed = now - session.lastUpdate;
+        const elapsed = now - (session.lastUpdate ?? session.startTime);
 
         // Update session duration and timestamp
-        session.duration += elapsed;
+        session.duration = (session.duration ?? 0) + elapsed;
         session.lastUpdate = now;
         totalElapsed += elapsed;
         await storageManager.saveSession(session);
@@ -75,14 +75,17 @@ class AlarmManager {
       if (!stats) {
         stats = {
           date: today,
+          total_seconds: 0,
+          session_count: 0,
           totalTime: 0,
           prCount: 0,
           sessions: [],
         };
       }
 
-      // Add elapsed time to daily total
-      stats.totalTime += totalElapsed;
+      // Add elapsed time to daily total (convert ms to seconds for total_seconds)
+      stats.total_seconds = (stats.total_seconds ?? 0) + Math.round(totalElapsed / 1000);
+      stats.totalTime = (stats.totalTime ?? 0) + totalElapsed;
       await storageManager.saveDailyStats(stats);
     }
 
@@ -105,8 +108,8 @@ class AlarmManager {
     for (const session of Object.values(sessions)) {
       if (session.active) {
         // Final time update before stopping
-        const elapsed = now - session.lastUpdate;
-        session.duration += elapsed;
+        const elapsed = now - (session.lastUpdate ?? session.startTime);
+        session.duration = (session.duration ?? 0) + elapsed;
         session.active = false;
         session.endTime = now;
         session.lastUpdate = now;
@@ -129,8 +132,8 @@ class AlarmManager {
 
     for (const session of Object.values(sessions)) {
       if (session.tabId === tabId && session.active) {
-        const elapsed = now - session.lastUpdate;
-        session.duration += elapsed;
+        const elapsed = now - (session.lastUpdate ?? session.startTime);
+        session.duration = (session.duration ?? 0) + elapsed;
         session.active = false;
         session.endTime = now;
         session.lastUpdate = now;

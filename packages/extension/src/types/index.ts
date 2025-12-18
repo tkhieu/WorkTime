@@ -22,20 +22,28 @@ export interface StorageData {
   };
 }
 
-export type MessageType =
+export type MessageTypeString =
   | 'PR_DETECTED'
   | 'START_TRACKING'
   | 'STOP_TRACKING'
   | 'GET_ACTIVE_SESSION'
+  | 'GET_STATUS'
   | 'ACTIVITY_HEARTBEAT'
   | 'SYNC_DATA'
   | 'TAB_VISIBLE'
-  | 'TAB_HIDDEN';
+  | 'TAB_HIDDEN'
+  | 'GITHUB_LOGIN'
+  | 'GITHUB_LOGOUT'
+  | 'GITHUB_STATUS';
 
-export interface ExtensionMessage {
-  type: MessageType;
+export interface MessageType {
+  type: MessageTypeString;
   data?: any;
+  tabId?: number;
 }
+
+// Alias for backwards compatibility
+export type ExtensionMessage = MessageType;
 
 // Settings types
 export interface Settings {

@@ -75,11 +75,11 @@ function handleMessage(
   console.log('[ServiceWorker] Message received:', message.type);
 
   if (message.type === 'PR_DETECTED') {
-    handlePRDetected(message.data, message.tabId).catch(console.error);
+    handlePRDetected(message.data, message.tabId ?? -1).catch(console.error);
   } else if (message.type === 'TAB_HIDDEN') {
-    handleTabHidden(message.tabId).catch(console.error);
+    handleTabHidden(message.tabId ?? -1).catch(console.error);
   } else if (message.type === 'TAB_VISIBLE') {
-    handleTabVisible(message.tabId).catch(console.error);
+    handleTabVisible(message.tabId ?? -1).catch(console.error);
   } else if (message.type === 'GET_STATUS') {
     getTrackingStatus()
       .then(sendResponse)

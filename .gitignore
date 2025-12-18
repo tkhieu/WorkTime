@@ -74,3 +74,6 @@ claude-flow
 hive-mind-prompt-*.txt
 .claude
 node_modules
+# Gemini CLI settings (contains user-specific config)
+.gemini/
+plans/templates

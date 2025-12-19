@@ -278,6 +278,16 @@ interface SyncQueueItem {
 
 ## Implementation Status
 
+### Completed (Phase 01)
+- D1 schema implementation with four core tables:
+  - `users` - GitHub user accounts
+  - `time_sessions` - PR review session tracking
+  - `daily_stats` - Aggregated daily statistics
+  - `pr_review_activities` - User PR review actions (comment, approve, request_changes)
+- TypeScript types for all database entities
+- Migration files for schema deployment
+- Index optimization for common query patterns
+
 ### Completed (Phase 05-06)
 - OAuth 2.0 + PKCE flow implementation
 - Popup UI scaffolding (basic interface)
@@ -287,11 +297,11 @@ interface SyncQueueItem {
 - GitHub OAuth integration
 
 ### In Progress (Phase 07-08)
-- D1 schema finalization and migrations
 - Full PR tracking logic refinement
 - Session synchronization testing
 - Comprehensive unit/integration tests
 - Error handling and edge cases
+- Database query layer implementation
 
 ### Pending (Phase 09-10)
 - Analytics dashboard UI
@@ -424,45 +434,82 @@ packages/shared/src/
 
 ## Database Schema (D1)
 
-### Planned Tables
-
-**sessions**
-```sql
-CREATE TABLE sessions (
-  id TEXT PRIMARY KEY,
-  user_id INTEGER NOT NULL,
-  pr_url TEXT NOT NULL,
-  start_time DATETIME NOT NULL,
-  end_time DATETIME,
-  duration_ms INTEGER,
-  repo_name TEXT,
-  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-  FOREIGN KEY (user_id) REFERENCES users(id)
-);
-```
+### Implemented Tables (Phase 01)
 
 **users**
 ```sql
 CREATE TABLE users (
-  id INTEGER PRIMARY KEY,
-  github_id INTEGER UNIQUE NOT NULL,
-  github_login TEXT UNIQUE NOT NULL,
+  user_id INTEGER PRIMARY KEY AUTOINCREMENT,
+  github_user_id TEXT UNIQUE NOT NULL,
+  github_username TEXT NOT NULL,
+  github_avatar_url TEXT,
   email TEXT,
-  created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  created_at TEXT DEFAULT (datetime('now')),
+  updated_at TEXT DEFAULT (datetime('now'))
 );
 ```
 
-**tokens**
+**time_sessions**
 ```sql
-CREATE TABLE tokens (
-  id TEXT PRIMARY KEY,
+CREATE TABLE time_sessions (
+  session_id INTEGER PRIMARY KEY AUTOINCREMENT,
   user_id INTEGER NOT NULL,
-  access_token TEXT NOT NULL,
-  expires_at DATETIME NOT NULL,
-  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-  FOREIGN KEY (user_id) REFERENCES users(id)
+  repo_owner TEXT NOT NULL,
+  repo_name TEXT NOT NULL,
+  pr_number INTEGER NOT NULL,
+  start_time TEXT NOT NULL,
+  end_time TEXT,
+  duration_seconds INTEGER,
+  status TEXT DEFAULT 'active' CHECK(status IN ('active', 'completed', 'cancelled')),
+  created_at TEXT DEFAULT (datetime('now')),
+  updated_at TEXT DEFAULT (datetime('now')),
+  FOREIGN KEY (user_id) REFERENCES users(user_id)
 );
 ```
+
+**daily_stats**
+```sql
+CREATE TABLE daily_stats (
+  stat_id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id INTEGER NOT NULL,
+  date TEXT NOT NULL,
+  total_seconds INTEGER DEFAULT 0,
+  session_count INTEGER DEFAULT 0,
+  created_at TEXT DEFAULT (datetime('now')),
+  updated_at TEXT DEFAULT (datetime('now')),
+  FOREIGN KEY (user_id) REFERENCES users(user_id),
+  UNIQUE(user_id, date)
+);
+```
+
+**pr_review_activities** (Added 2025-12-19)
+```sql
+CREATE TABLE pr_review_activities (
+  activity_id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id INTEGER NOT NULL,
+  activity_type TEXT NOT NULL CHECK(activity_type IN ('comment', 'approve', 'request_changes')),
+  repo_owner TEXT NOT NULL,
+  repo_name TEXT NOT NULL,
+  pr_number INTEGER NOT NULL,
+  session_id INTEGER,
+  metadata TEXT,
+  created_at TEXT DEFAULT (datetime('now')),
+  updated_at TEXT DEFAULT (datetime('now')),
+  FOREIGN KEY (user_id) REFERENCES users(user_id),
+  FOREIGN KEY (session_id) REFERENCES time_sessions(session_id) ON DELETE SET NULL
+);
+```
+
+**Key Indexes:**
+- `idx_users_github_id` - GitHub user lookup
+- `idx_sessions_user_id` - User sessions
+- `idx_sessions_status` - Active session tracking
+- `idx_sessions_repo` - Repository-scoped queries
+- `idx_daily_stats_user_date` - Daily aggregations
+- `idx_activities_user_created` - User activity timeline
+- `idx_activities_type_created` - Analytics by activity type
+- `idx_activities_repo` - Repository activity tracking
+- `idx_activities_pr` - PR-scoped activities and session linking
 
 ---
 

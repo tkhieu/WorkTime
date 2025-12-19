@@ -91,12 +91,6 @@ main {
   font-variant-numeric: tabular-nums;
 }
 
-.controls {
-  display: flex;
-  gap: 10px;
-  margin-bottom: 20px;
-}
-
 .btn {
   flex: 1;
   padding: 12px;

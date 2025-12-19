@@ -124,3 +124,18 @@ export interface PendingActivity {
   created_at: string;
   synced: boolean;
 }
+
+// Pending session for offline sync
+export interface PendingSession {
+  localId: string;
+  backendId?: number;
+  action: 'start' | 'end';
+  data: {
+    repo_owner: string;
+    repo_name: string;
+    pr_number: number;
+    duration_seconds?: number;
+  };
+  created_at: string;
+  synced: boolean;
+}

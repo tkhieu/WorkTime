@@ -14,6 +14,16 @@ import { alarmManager } from './alarm-manager';
 import { githubOAuth } from '../auth/github-oauth';
 import { tokenManager } from '../auth/token-manager';
 import { handlePRActivityDetected, initActivityHandler, trySyncActivities } from './activity-handler';
+import {
+  initSessionHandler,
+  startSession,
+  endSession,
+  pauseSession,
+  resumeSession,
+  getActiveSessionForTab,
+  trySyncSessions,
+} from './session-handler';
+import { initSyncManager, handleSyncAlarm, forceSyncNow } from './sync-manager';
 import type { MessageType } from '../types';
 
 // ======================================
@@ -27,7 +37,10 @@ chrome.runtime.onMessage.addListener(handleMessage);
 chrome.tabs.onActivated.addListener(handleTabActivated);
 chrome.tabs.onRemoved.addListener(handleTabRemoved);
 chrome.idle.onStateChanged.addListener(handleIdleStateChange);
-chrome.alarms.onAlarm.addListener((alarm) => alarmManager.handleAlarm(alarm));
+chrome.alarms.onAlarm.addListener((alarm) => {
+  alarmManager.handleAlarm(alarm);
+  handleSyncAlarm(alarm);
+});
 
 // ======================================
 // INITIALIZATION
@@ -55,6 +68,12 @@ async function initialize(): Promise<void> {
 
     // Initialize activity handler for PR review tracking
     await initActivityHandler();
+
+    // Initialize session handler for session tracking
+    await initSessionHandler();
+
+    // Initialize sync manager for periodic sync
+    await initSyncManager();
 
     // Setup idle detection
     const settings = await storageManager.getSettings();
@@ -128,40 +147,91 @@ function handleMessage(
 
 /**
  * Handle PR detected event from content script
- * Phase 03: Full implementation
+ * Creates or resumes session for the detected PR
  */
 async function handlePRDetected(
-  prInfo: { owner: string; repo: string; prNumber: number; url: string },
-  _tabId: number
+  prInfo: {
+    prUrl: string;
+    prTitle: string;
+    repositoryName: string;
+    prNumber: number;
+  },
+  tabId: number
 ): Promise<void> {
-  console.log('[ServiceWorker] PR detected:', prInfo, 'in tab', _tabId);
-  // Phase 03: Create new tracking session
+  console.log('[ServiceWorker] PR detected:', prInfo, 'in tab', tabId);
+
+  // Check for existing active session for this tab
+  const existingSession = await getActiveSessionForTab(tabId);
+
+  if (existingSession) {
+    // Same PR? Resume session. Different PR? End old, start new.
+    const sameRepo = existingSession.repoOwner + '/' + existingSession.repoName === prInfo.repositoryName;
+    const samePR = existingSession.prNumber === prInfo.prNumber;
+
+    if (sameRepo && samePR) {
+      // Resume existing session
+      await resumeSession(existingSession.id);
+      console.log('[ServiceWorker] Resumed existing session:', existingSession.id);
+      return;
+    } else {
+      // End old session, start new
+      await endSession(existingSession.id);
+      console.log('[ServiceWorker] Ended old session for new PR');
+    }
+  }
+
+  // Start new session
+  const session = await startSession(prInfo, tabId);
+  console.log('[ServiceWorker] Started new session:', session.id);
 }
 
 /**
  * Handle tab hidden event (Page Visibility API)
- * Phase 04: Full implementation
+ * Pauses tracking for the tab
  */
 async function handleTabHidden(tabId: number): Promise<void> {
   console.log('[ServiceWorker] Tab hidden:', tabId);
-  // Phase 04: Pause tracking for this tab
+
+  const session = await getActiveSessionForTab(tabId);
+  if (session) {
+    await pauseSession(session.id);
+    console.log('[ServiceWorker] Paused session:', session.id);
+  }
 }
 
 /**
  * Handle tab visible event (Page Visibility API)
- * Phase 04: Full implementation
+ * Resumes tracking for the tab
  */
 async function handleTabVisible(tabId: number): Promise<void> {
   console.log('[ServiceWorker] Tab visible:', tabId);
-  // Phase 04: Resume tracking for this tab
+
+  const session = await getActiveSessionForTab(tabId);
+  if (session) {
+    await resumeSession(session.id);
+    console.log('[ServiceWorker] Resumed session:', session.id);
+  }
 }
 
 /**
  * Handle tab activation (user switched tabs)
+ * Pauses previous tab's session, resumes new tab's session
  */
 async function handleTabActivated(activeInfo: chrome.tabs.TabActiveInfo): Promise<void> {
   console.log('[ServiceWorker] Tab activated:', activeInfo.tabId);
-  // Phase 04: Pause previous tab, resume new tab if PR page
+
+  // Get all active sessions
+  const activeSessions = await storageManager.getActiveSessions();
+
+  for (const session of activeSessions) {
+    if (session.tabId === activeInfo.tabId) {
+      // This is the newly activated tab - resume it
+      await resumeSession(session.id);
+    } else if (session.active) {
+      // Pause other tabs' sessions
+      await pauseSession(session.id);
+    }
+  }
 }
 
 /**
@@ -170,7 +240,14 @@ async function handleTabActivated(activeInfo: chrome.tabs.TabActiveInfo): Promis
 async function handleTabRemoved(tabId: number): Promise<void> {
   console.log('[ServiceWorker] Tab removed:', tabId);
 
-  // Stop tracking for this tab
+  // End session for this tab (includes API sync)
+  const session = await getActiveSessionForTab(tabId);
+  if (session) {
+    await endSession(session.id);
+    console.log('[ServiceWorker] Ended session for closed tab:', session.id);
+  }
+
+  // Also stop alarm tracking (existing behavior)
   await alarmManager.stopTrackingForTab(tabId);
 }
 
@@ -183,9 +260,19 @@ async function handleIdleStateChange(newState: chrome.idle.IdleState): Promise<v
   const settings = await storageManager.getSettings();
 
   if ((newState === 'idle' || newState === 'locked') && settings.autoStopOnIdle) {
-    // Pause all active tracking
+    // Pause all active sessions
+    const activeSessions = await storageManager.getActiveSessions();
+    for (const session of activeSessions) {
+      await pauseSession(session.id);
+    }
+    console.log('[ServiceWorker] All sessions paused due to idle state');
+
+    // Also stop alarm tracking
     await alarmManager.stopAllTracking();
-    console.log('[ServiceWorker] All tracking stopped due to idle state');
+  } else if (newState === 'active') {
+    // Resume sessions when user becomes active
+    // Note: Sessions will resume naturally when user interacts with tabs
+    console.log('[ServiceWorker] User active again');
   }
 }
 
@@ -255,6 +342,11 @@ async function handleGitHubLogin(): Promise<unknown> {
  */
 async function handleGitHubLogout(): Promise<void> {
   console.log('[ServiceWorker] GitHub logout requested');
+
+  // Sync pending data before logout
+  await forceSyncNow();
+
+  // Then logout
   await githubOAuth.logout();
 }
 

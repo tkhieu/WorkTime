@@ -6,6 +6,9 @@ import { initActivityDetector } from './activity-detector';
 
 console.log('WorkTime PR Detector loaded');
 
+// Prevent duplicate visibility listener registration
+let visibilityTrackingInitialized = false;
+
 // Detect if current page is a GitHub PR
 function detectPR() {
   const url = window.location.href;
@@ -17,6 +20,9 @@ function detectPR() {
 
     // Initialize activity detection for this PR
     initActivityDetector();
+
+    // Initialize visibility tracking for this PR
+    initVisibilityTracking();
   }
 }
 
@@ -89,5 +95,47 @@ setInterval(() => {
     });
   }
 }, 30000);
+
+// ======================================
+// PAGE VISIBILITY TRACKING
+// ======================================
+
+/**
+ * Track page visibility changes
+ * Used to pause/resume session tracking
+ */
+function initVisibilityTracking(): void {
+  if (visibilityTrackingInitialized) {
+    console.log('[PRDetector] Visibility tracking already initialized');
+    return;
+  }
+
+  document.addEventListener('visibilitychange', () => {
+    const isVisible = document.visibilityState === 'visible';
+
+    if (isVisible) {
+      console.log('[PRDetector] Tab became visible');
+      chrome.runtime.sendMessage({
+        type: 'TAB_VISIBLE',
+        data: {
+          url: window.location.href,
+          timestamp: Date.now(),
+        },
+      });
+    } else {
+      console.log('[PRDetector] Tab became hidden');
+      chrome.runtime.sendMessage({
+        type: 'TAB_HIDDEN',
+        data: {
+          url: window.location.href,
+          timestamp: Date.now(),
+        },
+      });
+    }
+  });
+
+  visibilityTrackingInitialized = true;
+  console.log('[PRDetector] Visibility tracking initialized');
+}
 
 export {};

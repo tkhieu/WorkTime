@@ -53,3 +53,25 @@ export interface GitHubUser {
   avatar_url: string;
   email: string | null;
 }
+
+// PR Review Activity Types
+export type PRReviewActivityType = 'comment' | 'approve' | 'request_changes';
+
+export interface PRReviewActivity {
+  activity_id: number;
+  user_id: number;
+  activity_type: PRReviewActivityType;
+  repo_owner: string;
+  repo_name: string;
+  pr_number: number;
+  session_id: number | null;
+  metadata: string | null; // JSON string
+  created_at: string;
+  updated_at: string;
+}
+
+export interface PRReviewActivityMetadata {
+  duration_seconds?: number; // Time spent on action
+  is_inline_comment?: boolean;
+  // Note: No content storage for privacy
+}

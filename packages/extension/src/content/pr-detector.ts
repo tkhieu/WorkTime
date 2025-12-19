@@ -2,6 +2,7 @@
 // Runs on GitHub PR pages to detect and track review activity
 
 import { parseGitHubPRUrl } from '@worktime/shared';
+import { initActivityDetector } from './activity-detector';
 
 console.log('WorkTime PR Detector loaded');
 
@@ -13,6 +14,9 @@ function detectPR() {
   if (prInfo) {
     console.log('PR detected:', prInfo);
     notifyBackgroundOfPR(prInfo);
+
+    // Initialize activity detection for this PR
+    initActivityDetector();
   }
 }
 

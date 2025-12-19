@@ -13,6 +13,7 @@ import { storageManager } from './storage-manager';
 import { alarmManager } from './alarm-manager';
 import { githubOAuth } from '../auth/github-oauth';
 import { tokenManager } from '../auth/token-manager';
+import { handlePRActivityDetected, initActivityHandler, trySyncActivities } from './activity-handler';
 import type { MessageType } from '../types';
 
 // ======================================
@@ -52,6 +53,9 @@ async function initialize(): Promise<void> {
     // Start periodic alarms for time tracking
     await alarmManager.initialize();
 
+    // Initialize activity handler for PR review tracking
+    await initActivityHandler();
+
     // Setup idle detection
     const settings = await storageManager.getSettings();
     chrome.idle.setDetectionInterval(settings.idleThreshold);
@@ -78,6 +82,8 @@ function handleMessage(
 
   if (message.type === 'PR_DETECTED') {
     handlePRDetected(message.data, message.tabId ?? -1).catch(console.error);
+  } else if (message.type === 'PR_ACTIVITY_DETECTED') {
+    handlePRActivityDetected(message.data).catch(console.error);
   } else if (message.type === 'TAB_HIDDEN') {
     handleTabHidden(message.tabId ?? -1).catch(console.error);
   } else if (message.type === 'TAB_VISIBLE') {

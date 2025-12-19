@@ -5,6 +5,7 @@ import { corsMiddleware } from './middleware/cors';
 import auth from './routes/auth';
 import sessions from './routes/sessions';
 import stats from './routes/stats';
+import activities from './routes/activities';
 
 const app = new Hono<{ Bindings: Env }>();
 
@@ -24,6 +25,7 @@ app.get('/health', (c) => {
 app.route('/auth', auth);
 app.route('/api/sessions', sessions);
 app.route('/api/stats', stats);
+app.route('/api/activities', activities);
 
 // 404 handler
 app.notFound((c) => {

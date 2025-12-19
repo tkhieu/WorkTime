@@ -46,3 +46,24 @@ CREATE TABLE IF NOT EXISTS daily_stats (
 );
 
 CREATE INDEX idx_daily_stats_user_date ON daily_stats(user_id, date DESC);
+
+-- PR Review Activities table (added 2025-12-19)
+CREATE TABLE IF NOT EXISTS pr_review_activities (
+  activity_id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id INTEGER NOT NULL,
+  activity_type TEXT NOT NULL CHECK(activity_type IN ('comment', 'approve', 'request_changes')),
+  repo_owner TEXT NOT NULL,
+  repo_name TEXT NOT NULL,
+  pr_number INTEGER NOT NULL,
+  session_id INTEGER,
+  metadata TEXT,
+  created_at TEXT DEFAULT (datetime('now')),
+  updated_at TEXT DEFAULT (datetime('now')),
+  FOREIGN KEY (user_id) REFERENCES users(user_id),
+  FOREIGN KEY (session_id) REFERENCES time_sessions(session_id) ON DELETE SET NULL
+);
+
+CREATE INDEX idx_activities_user_created ON pr_review_activities(user_id, created_at DESC);
+CREATE INDEX idx_activities_type_created ON pr_review_activities(activity_type, created_at DESC);
+CREATE INDEX idx_activities_repo ON pr_review_activities(repo_owner, repo_name, created_at DESC);
+CREATE INDEX idx_activities_pr ON pr_review_activities(repo_owner, repo_name, pr_number);

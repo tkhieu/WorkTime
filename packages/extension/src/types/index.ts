@@ -24,6 +24,7 @@ export interface StorageData {
 
 export type MessageTypeString =
   | 'PR_DETECTED'
+  | 'PR_ACTIVITY_DETECTED'
   | 'START_TRACKING'
   | 'STOP_TRACKING'
   | 'GET_ACTIVE_SESSION'
@@ -100,3 +101,26 @@ export interface GitHubAuth {
 
 // Re-export DailyStats from shared for convenience
 export type { DailyStats } from '@worktime/shared';
+
+// PR Review Activity Types
+export type PRReviewActivityType = 'comment' | 'approve' | 'request_changes';
+
+export interface PRActivityData {
+  activity_type: PRReviewActivityType;
+  repo_owner: string;
+  repo_name: string;
+  pr_number: number;
+  metadata?: {
+    comment_length?: number;
+    is_inline_comment?: boolean;
+    duration_seconds?: number;
+  };
+  timestamp: number;
+}
+
+export interface PendingActivity {
+  id: string;
+  data: PRActivityData;
+  created_at: string;
+  synced: boolean;
+}

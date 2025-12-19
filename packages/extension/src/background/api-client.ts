@@ -242,6 +242,68 @@ export class WorkTimeAPI {
       throw new WorkTimeAPIError('Backend unavailable');
     }
   }
+
+  /**
+   * Create a single PR review activity
+   */
+  async createActivity(data: {
+    activity_type: string;
+    repo_owner: string;
+    repo_name: string;
+    pr_number: number;
+    metadata?: object;
+    created_at?: string;
+  }): Promise<{ activity_id: number }> {
+    return this.request<{ activity_id: number }>('/api/activities', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  /**
+   * Create multiple PR review activities in batch
+   */
+  async createActivitiesBatch(activities: Array<{
+    activity_type: string;
+    repo_owner: string;
+    repo_name: string;
+    pr_number: number;
+    metadata?: object;
+    created_at?: string;
+  }>): Promise<{ created_count: number; activity_ids: number[] }> {
+    return this.request<{ created_count: number; activity_ids: number[] }>(
+      '/api/activities/batch',
+      {
+        method: 'POST',
+        body: JSON.stringify({ activities }),
+      }
+    );
+  }
+
+  /**
+   * Get activity statistics for the user
+   */
+  async getActivityStats(days: number = 30): Promise<{
+    stats: Array<{
+      date: string;
+      comment_count: number;
+      approve_count: number;
+      request_changes_count: number;
+      total_count: number;
+    }>;
+  }> {
+    return this.request<{
+      stats: Array<{
+        date: string;
+        comment_count: number;
+        approve_count: number;
+        request_changes_count: number;
+        total_count: number;
+      }>;
+    }>(`/api/activities/stats?days=${days}`, {
+      method: 'GET',
+    });
+  }
 }
 
 // Singleton instance

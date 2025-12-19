@@ -108,3 +108,48 @@ export interface APIResponse<T> {
   data?: T;
   error?: APIError;
 }
+
+// PR Review Activity Types
+export type PRReviewActivityType = 'comment' | 'approve' | 'request_changes';
+
+export interface ActivityCreateRequest {
+  activity_type: PRReviewActivityType;
+  repo_owner: string;
+  repo_name: string;
+  pr_number: number;
+  session_id?: number;
+  metadata?: {
+    duration_seconds?: number;
+    is_inline_comment?: boolean;
+  };
+  created_at?: string;
+}
+
+export interface ActivityBatchRequest {
+  activities: ActivityCreateRequest[];
+}
+
+export interface ActivityResponse {
+  activity_id: number;
+  activity_type: PRReviewActivityType;
+  repo_owner: string;
+  repo_name: string;
+  pr_number: number;
+  created_at: string;
+}
+
+export interface ActivityListResponse {
+  activities: ActivityResponse[];
+  total: number;
+  limit: number;
+  offset: number;
+  has_more: boolean;
+}
+
+export interface ActivityStatsResponse {
+  date: string;
+  comment_count: number;
+  approve_count: number;
+  request_changes_count: number;
+  total_count: number;
+}

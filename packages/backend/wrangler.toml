@@ -16,16 +16,19 @@ name = "worktime-backend-dev"
 [env.production]
 name = "worktime-backend-prod"
 
-# D1 Database binding (to be configured in Phase 08)
-# [[d1_databases]]
-# binding = "DB"
-# database_name = "worktime-db"
-# database_id = "YOUR_DATABASE_ID"
+# D1 Database binding
+# Run: wrangler d1 create worktime-db
+[[d1_databases]]
+binding = "DB"
+database_name = "worktime-db"
+database_id = "YOUR_DATABASE_ID"
 
-# KV namespace for token storage (to be configured in Phase 08)
-# [[kv_namespaces]]
-# binding = "TOKENS"
-# id = "YOUR_KV_ID"
+# KV namespace for GitHub token storage
+# Binding must be "KV" to match code: c.env.KV
+# Run: wrangler kv:namespace create KV
+[[kv_namespaces]]
+binding = "KV"
+id = "YOUR_KV_ID"
 
 # R2 bucket for file storage (optional)
 # [[r2_buckets]]

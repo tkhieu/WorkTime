@@ -1,10 +1,6 @@
 import { tokenManager } from './token-manager';
+import { config } from '../config/env';
 import type { GitHubAuth } from '../types';
-
-// TODO: Replace with your actual Client ID from GitHub OAuth App
-// Register at: https://github.com/settings/developers
-const GITHUB_CLIENT_ID = 'YOUR_CLIENT_ID_HERE';
-const GITHUB_CLIENT_SECRET = 'YOUR_CLIENT_SECRET_HERE'; // Should be in environment variable
 
 // PKCE helpers
 function generateRandomString(length: number): string {
@@ -36,54 +32,55 @@ function base64URLEncode(buffer: ArrayBuffer): string {
     .replace(/=/g, '');
 }
 
+export interface LoginResult {
+  token: string;  // JWT from backend
+  user: {
+    user_id: number;
+    github_username: string;
+    github_avatar_url: string | null;
+    email: string | null;
+  };
+}
+
 export class GitHubOAuth {
-  async login(): Promise<void> {
+  async login(): Promise<LoginResult> {
     try {
       console.log('Starting GitHub OAuth flow');
 
-      // Generate PKCE values
+      // 1. Generate PKCE values
       const codeVerifier = generateRandomString(128);
       const hashed = await sha256(codeVerifier);
       const codeChallenge = base64URLEncode(hashed);
 
-      // Store code verifier for later use
-      await chrome.storage.local.set({ pkce_code_verifier: codeVerifier });
-
-      // Get redirect URL
+      // 2. Get redirect URL
       const redirectURL = chrome.identity.getRedirectURL();
       console.log('Redirect URL:', redirectURL);
 
-      // Build authorization URL
+      // 3. Build auth URL - NO client_secret
       const authURL = new URL('https://github.com/login/oauth/authorize');
-      authURL.searchParams.set('client_id', GITHUB_CLIENT_ID);
+      authURL.searchParams.set('client_id', config.GITHUB_CLIENT_ID);
       authURL.searchParams.set('redirect_uri', redirectURL);
       authURL.searchParams.set('scope', 'repo read:user');
-      authURL.searchParams.set('response_type', 'code');
       authURL.searchParams.set('code_challenge', codeChallenge);
       authURL.searchParams.set('code_challenge_method', 'S256');
 
-      // Launch OAuth flow
+      // 4. Launch OAuth
       const responseURL = await chrome.identity.launchWebAuthFlow({
         url: authURL.toString(),
         interactive: true
       });
 
-      console.log('OAuth redirect received:', responseURL);
-
       if (!responseURL) {
-        throw new Error('OAuth flow was cancelled or failed');
+        throw new Error('OAuth cancelled');
       }
 
-      // Extract authorization code
-      const url = new URL(responseURL);
-      const code = url.searchParams.get('code');
-
+      const code = new URL(responseURL).searchParams.get('code');
       if (!code) {
-        throw new Error('No authorization code received');
+        throw new Error('No authorization code');
       }
 
-      // Exchange code for token
-      await this.exchangeCodeForToken(code, codeVerifier, redirectURL);
+      // 5. Exchange via BACKEND (not GitHub directly)
+      return await this.exchangeCodeViaBackend(code, codeVerifier, redirectURL);
 
     } catch (error) {
       console.error('GitHub OAuth login failed:', error);
@@ -91,68 +88,52 @@ export class GitHubOAuth {
     }
   }
 
-  private async exchangeCodeForToken(code: string, codeVerifier: string, redirectURI: string): Promise<void> {
-    const tokenURL = 'https://github.com/login/oauth/access_token';
-
-    const response = await fetch(tokenURL, {
+  private async exchangeCodeViaBackend(
+    code: string,
+    codeVerifier: string,
+    redirectUri: string
+  ): Promise<LoginResult> {
+    const response = await fetch(`${config.API_BASE_URL}/auth/github/callback`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json'
-      },
-      body: JSON.stringify({
-        client_id: GITHUB_CLIENT_ID,
-        client_secret: GITHUB_CLIENT_SECRET,
-        code: code,
-        redirect_uri: redirectURI,
-        code_verifier: codeVerifier
-      })
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ code, codeVerifier, redirectUri })
     });
 
     if (!response.ok) {
-      throw new Error(`Token exchange failed: ${response.statusText}`);
+      const err = await response.json().catch(() => ({ error: 'Auth failed' }));
+      throw new Error(err.error || 'Authentication failed');
     }
 
-    const data = await response.json();
+    const result: LoginResult = await response.json();
 
-    if (data.error) {
-      throw new Error(`Token exchange error: ${data.error_description}`);
-    }
+    // Store JWT token for future API calls
+    await tokenManager.saveJWT(result.token);
 
-    // Fetch user info
-    const user = await this.fetchUserInfo(data.access_token);
+    // Store user info
+    await tokenManager.saveUser({
+      id: result.user.user_id,
+      login: result.user.github_username,
+      avatar_url: result.user.github_avatar_url ?? undefined,
+      name: undefined
+    });
 
-    // Store auth data
+    // Store for backwards compat
     const auth: GitHubAuth = {
-      accessToken: data.access_token,
+      accessToken: result.token,
       tokenType: 'bearer',
-      scope: data.scope,
-      expiresAt: null, // OAuth Apps don't expire
+      scope: 'repo read:user',
+      expiresAt: null,
       user: {
-        login: user.login,
-        id: user.id,
-        avatar_url: user.avatar_url,
-        name: user.name || user.login
+        id: result.user.user_id,
+        login: result.user.github_username,
+        avatar_url: result.user.github_avatar_url ?? undefined,
+        email: result.user.email ?? undefined
       }
     };
-
     await tokenManager.saveAuth(auth);
-    console.log('GitHub authentication successful:', user.login);
-  }
 
-  private async fetchUserInfo(accessToken: string): Promise<any> {
-    const response = await fetch('https://api.github.com/user', {
-      headers: {
-        'Authorization': `Bearer ${accessToken}`,
-        'Accept': 'application/vnd.github.v3+json'
-      }
-    });
-
-    if (!response.ok) {
-      throw new Error(`Failed to fetch user info: ${response.statusText}`);
-    }
-
-    return response.json();
+    console.log('GitHub authentication successful:', result.user.github_username);
+    return result;
   }
 
   async logout(): Promise<void> {
@@ -161,21 +142,20 @@ export class GitHubOAuth {
   }
 
   async getAuthStatus(): Promise<{ authenticated: boolean; user?: any }> {
+    // Check JWT-based authentication (new flow)
+    const jwt = await tokenManager.getJWT();
+    if (jwt && !tokenManager.isTokenExpired(jwt)) {
+      const user = await tokenManager.getUser();
+      return { authenticated: true, user };
+    }
+
+    // Fallback to legacy auth check
     const auth = await tokenManager.getAuth();
-    if (!auth) {
-      return { authenticated: false };
+    if (auth?.user) {
+      return { authenticated: true, user: auth.user };
     }
 
-    const isValid = await tokenManager.validateToken();
-    if (!isValid) {
-      await tokenManager.clearAuth();
-      return { authenticated: false };
-    }
-
-    return {
-      authenticated: true,
-      user: auth.user
-    };
+    return { authenticated: false };
   }
 }
 

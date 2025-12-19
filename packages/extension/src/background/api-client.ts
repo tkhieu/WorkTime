@@ -46,27 +46,27 @@ export class WorkTimeAPI {
 
   /**
    * Set JWT token for authentication
+   * @deprecated Use tokenManager.saveJWT() instead
    */
   async setToken(token: string): Promise<void> {
     this.token = token;
-    await chrome.storage.local.set({ authToken: token });
+    const { tokenManager } = await import('../auth/token-manager');
+    await tokenManager.saveJWT(token);
   }
 
   /**
-   * Get current token from memory or storage
+   * Get current token from tokenManager
    */
   async getToken(): Promise<string | null> {
-    if (this.token) {
-      return this.token;
+    const { tokenManager } = await import('../auth/token-manager');
+    const jwt = await tokenManager.getJWT();
+
+    // Auto-refresh if expired
+    if (jwt && tokenManager.isTokenExpired(jwt)) {
+      return await tokenManager.refreshToken();
     }
 
-    const result = await chrome.storage.local.get('authToken');
-    if (result.authToken) {
-      this.token = result.authToken;
-      return this.token;
-    }
-
-    return null;
+    return jwt;
   }
 
   /**
@@ -74,18 +74,21 @@ export class WorkTimeAPI {
    */
   async clearToken(): Promise<void> {
     this.token = null;
-    await chrome.storage.local.remove('authToken');
+    const { tokenManager } = await import('../auth/token-manager');
+    await tokenManager.logout();
   }
 
   /**
    * Check if token is expired
    */
   async isTokenExpired(): Promise<boolean> {
-    const result = await chrome.storage.local.get('tokenExpiry');
-    if (!result.tokenExpiry) {
+    const token = await this.getToken();
+    if (!token) {
       return true;
     }
-    return Date.now() > result.tokenExpiry;
+
+    const { tokenManager } = await import('../auth/token-manager');
+    return tokenManager.isTokenExpired(token);
   }
 
   /**
@@ -124,6 +127,16 @@ export class WorkTimeAPI {
       clearTimeout(timeoutId);
 
       if (!response.ok) {
+        // Handle 401 Unauthorized - logout user
+        if (response.status === 401) {
+          console.error('Authentication failed - logging out');
+          await this.clearToken();
+          throw new WorkTimeAPIError(
+            'Authentication failed. Please login again.',
+            401
+          );
+        }
+
         const errorData: APIResponse<never> = await response
           .json()
           .catch(() => ({

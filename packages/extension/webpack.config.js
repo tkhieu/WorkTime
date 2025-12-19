@@ -1,5 +1,9 @@
 const path = require('path');
+const webpack = require('webpack');
 const CopyPlugin = require('copy-webpack-plugin');
+
+// Load .env file for local development
+require('dotenv').config();
 
 module.exports = {
   mode: process.env.NODE_ENV || 'development',
@@ -29,6 +33,10 @@ module.exports = {
     },
   },
   plugins: [
+    new webpack.DefinePlugin({
+      'process.env.GITHUB_CLIENT_ID': JSON.stringify(process.env.GITHUB_CLIENT_ID || ''),
+      'process.env.API_BASE_URL': JSON.stringify(process.env.API_BASE_URL || 'http://localhost:8787'),
+    }),
     new CopyPlugin({
       patterns: [
         { from: 'src/manifest.json', to: 'manifest.json' },

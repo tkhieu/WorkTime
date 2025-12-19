@@ -11,6 +11,8 @@
 
 import { storageManager } from './storage-manager';
 import { alarmManager } from './alarm-manager';
+import { githubOAuth } from '../auth/github-oauth';
+import { tokenManager } from '../auth/token-manager';
 import type { MessageType } from '../types';
 
 // ======================================
@@ -86,6 +88,14 @@ function handleMessage(
       .catch((error) => {
         console.error('[ServiceWorker] Error getting status:', error);
         sendResponse({ error: error.message });
+      });
+    return true; // Async response
+  } else if (message.type === 'GET_ACTIVE_SESSION') {
+    getActiveSession()
+      .then(sendResponse)
+      .catch((error) => {
+        console.error('[ServiceWorker] Error getting active session:', error);
+        sendResponse(null);
       });
     return true; // Async response
   } else if (message.type === 'GITHUB_LOGIN') {
@@ -191,28 +201,65 @@ async function getTrackingStatus(): Promise<unknown> {
 }
 
 /**
- * Handle GitHub login (Phase 05)
+ * Get active session for popup display
  */
-async function handleGitHubLogin(): Promise<unknown> {
-  console.log('[ServiceWorker] GitHub login requested (not implemented yet)');
-  return { error: 'GitHub login not implemented yet (Phase 05)' };
+async function getActiveSession(): Promise<unknown> {
+  const sessions = await storageManager.getAllSessions();
+  const activeSessions = Object.values(sessions).filter((s) => s.active);
+
+  if (activeSessions.length === 0) {
+    return null;
+  }
+
+  // Return the first active session
+  const session = activeSessions[0];
+  return {
+    prTitle: session.prTitle,
+    startTime: session.startTime,
+    repoOwner: session.repoOwner,
+    repoName: session.repoName,
+    prNumber: session.prNumber,
+  };
 }
 
 /**
- * Handle GitHub logout (Phase 05)
+ * Handle GitHub login
+ */
+async function handleGitHubLogin(): Promise<unknown> {
+  console.log('[ServiceWorker] GitHub login requested');
+
+  try {
+    await githubOAuth.login();
+    const authStatus = await githubOAuth.getAuthStatus();
+    return {
+      success: true,
+      authenticated: authStatus.authenticated,
+      user: authStatus.user,
+    };
+  } catch (error) {
+    console.error('[ServiceWorker] GitHub login error:', error);
+    return {
+      error: error instanceof Error ? error.message : 'Login failed',
+    };
+  }
+}
+
+/**
+ * Handle GitHub logout
  */
 async function handleGitHubLogout(): Promise<void> {
   console.log('[ServiceWorker] GitHub logout requested');
-  await storageManager.removeGitHubToken();
+  await githubOAuth.logout();
 }
 
 /**
- * Get GitHub authentication status (Phase 05)
+ * Get GitHub authentication status
  */
 async function getGitHubStatus(): Promise<unknown> {
-  const token = await storageManager.getGitHubToken();
+  const authStatus = await githubOAuth.getAuthStatus();
   return {
-    authenticated: !!token,
+    authenticated: authStatus.authenticated,
+    user: authStatus.user,
   };
 }
 

@@ -1,0 +1,71 @@
+{
+  // WorkTime Backend - Cloudflare Workers Configuration
+  // Use wrangler.jsonc (JSONC format with comments support)
+  "name": "worktime-backend",
+  "main": "src/index.ts",
+  "compatibility_date": "2024-01-01",
+  // Workers dev mode (true = *.workers.dev subdomain)
+  "workers_dev": true,
+  // D1 Database binding
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "worktime-db",
+      "database_id": "6dadf0fc-e2c7-4eff-aff0-77596d641fab" // Run: wrangler d1 create worktime-db
+    }
+  ],
+  // KV Namespace for GitHub token storage
+  "kv_namespaces": [
+    {
+      "binding": "KV", // Matches code: c.env.KV
+      "id": "8a82aac24b834f99804cd5c746fb723c" // Run: wrangler kv:namespace create KV
+    }
+  ],
+  // Development environment
+  "env": {
+    "development": {
+      "name": "worktime-backend-dev",
+      "vars": {
+        "ENVIRONMENT": "development"
+      },
+      "d1_databases": [
+        {
+          "binding": "DB",
+          "database_name": "worktime-db-dev",
+          "database_id": "YOUR_DEV_DATABASE_ID"
+        }
+      ],
+      "kv_namespaces": [
+        {
+          "binding": "KV",
+          "id": "YOUR_DEV_KV_ID",
+          "preview_id": "YOUR_DEV_KV_PREVIEW_ID" // For wrangler dev
+        }
+      ]
+    },
+    // Production environment
+    "production": {
+      "name": "worktime-backend-prod",
+      "vars": {
+        "ENVIRONMENT": "production"
+      },
+      "d1_databases": [
+        {
+          "binding": "DB",
+          "database_name": "worktime-db-prod",
+          "database_id": "YOUR_PROD_DATABASE_ID"
+        }
+      ],
+      "kv_namespaces": [
+        {
+          "binding": "KV",
+          "id": "YOUR_PROD_KV_ID"
+        }
+      ]
+    }
+  }
+  // Secrets (set via wrangler secret put, NOT in this file):
+  // - JWT_SECRET
+  // - GITHUB_CLIENT_ID
+  // - GITHUB_CLIENT_SECRET
+}

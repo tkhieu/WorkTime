@@ -177,3 +177,81 @@ footer a {
 footer a:hover {
   text-decoration: underline;
 }
+
+/* Login Prompt */
+.login-prompt {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 20px;
+}
+
+.login-content {
+  text-align: center;
+  max-width: 280px;
+}
+
+.github-icon {
+  color: #333;
+  margin-bottom: 20px;
+}
+
+.login-content h2 {
+  font-size: 18px;
+  margin-bottom: 8px;
+  color: #333;
+}
+
+.login-content p {
+  font-size: 14px;
+  color: #666;
+  margin-bottom: 24px;
+  line-height: 1.5;
+}
+
+.login-content .btn {
+  width: 100%;
+}
+
+/* User Info */
+.user-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 20px;
+  background: white;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+.user-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: 2px solid #667eea;
+}
+
+.user-name {
+  flex: 1;
+  font-size: 14px;
+  font-weight: 600;
+  color: #333;
+}
+
+.btn-icon {
+  padding: 6px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: #666;
+  border-radius: 4px;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.btn-icon:hover {
+  background: #f0f0f0;
+  color: #333;
+}

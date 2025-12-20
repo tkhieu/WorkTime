@@ -1,0 +1,130 @@
+================================================================================
+SCOUT REPORT SUMMARY - WorkTime Chrome Extension Architecture
+Date: 2025-12-20
+================================================================================
+
+REPORT FILES GENERATED:
+1. scout-251220-extension-structure.md  (Main architectural report)
+2. scout-code-patterns.md               (Code patterns & implementations)
+
+================================================================================
+QUICK FILE REFERENCE
+================================================================================
+
+BACKGROUND SERVICE WORKER (Event-Driven Core)
+  /src/background/service-worker.ts        - Event listeners, message dispatch
+  /src/background/session-handler.ts       - Session lifecycle + sync queue
+  /src/background/activity-handler.ts      - Activity tracking + batch sync
+  /src/background/storage-manager.ts       - Chrome storage abstraction
+  /src/background/sync-manager.ts          - Periodic sync orchestrator
+  /src/background/api-client.ts            - REST API client (not examined)
+  /src/background/alarm-manager.ts         - Time tracking alarms
+
+CONTENT SCRIPTS (PR Detection & Tracking)
+  /src/content/pr-detector.ts              - PR detection + visibility
+  /src/content/activity-detector.ts        - Form submit monitoring
+  /src/content/visibility-tracker.ts       - Page visibility API
+
+CONFIGURATION & TYPES
+  /src/manifest.json                       - MV3 extension config
+  /src/types/index.ts                      - Type definitions
+
+================================================================================
+KEY ARCHITECTURE PATTERNS
+================================================================================
+
+1. STORAGE-FIRST DESIGN
+   - All state persisted to chrome.storage.local immediately
+   - In-memory caches for performance
+   - Recovers from service worker restarts
+
+2. PENDING QUEUE PATTERN
+   - In-memory queue + storage persistence
+   - Handles offline scenarios gracefully
+   - Auto-retry on network recovery
+   - Only syncs when authenticated
+
+3. DUAL-ID PATTERN
+   - localId: Generated locally (timestamp + random)
+   - backendId: Assigned by server on first sync
+   - Enables offline creation + retroactive sync
+
+4. EVENT-DRIVEN TAB TRACKING
+   - tabs.onActivated: Pause old, resume new
+   - tabs.onRemoved: End session + sync
+   - idle.onStateChanged: Pause all on idle
+
+5. MESSAGE-DRIVEN ARCHITECTURE
+   - Content scripts only send messages (PR_DETECTED, PR_ACTIVITY_DETECTED, TAB_VISIBLE, TAB_HIDDEN)
+   - Service worker orchestrates all state mutations
+   - Clean separation of concerns
+
+6. DEBOUNCED ACTIVITY DETECTION
+   - 500ms debounce window
+   - Form submit listener (sync detection)
+   - MutationObserver (backup detection)
+
+================================================================================
+MESSAGE FLOW OVERVIEW
+================================================================================
+
+SESSION LIFECYCLE:
+  detectPR() → PR_DETECTED → handlePRDetected() → startSession()
+              → save locally → queue 'start' → trySyncSessions() → API
+
+  Tab Closes → handleTabRemoved() → endSession() → queue 'end' → trySyncSessions()
+
+  Tab Hidden → TAB_HIDDEN → pauseSession() → save locally
+  Tab Visible → TAB_VISIBLE → resumeSession() → save locally
+
+ACTIVITY TRACKING:
+  Form Submit → PR_ACTIVITY_DETECTED → handlePRActivityDetected()
+              → queue activity → saveActivityQueue() → trySyncActivities() → API
+
+PERIODIC SYNC:
+  Startup: forceSyncNow() → authenticate → sync sessions & activities
+  Every 5min: chrome.alarms fires → handleSyncAlarm() → forceSyncNow()
+
+================================================================================
+CRITICAL MV3 REQUIREMENTS (All Implemented)
+================================================================================
+
+✓ Event listeners registered synchronously at top level
+✓ Service worker initialization on onInstalled/onStartup
+✓ No setInterval/setTimeout (uses chrome.alarms)
+✓ Storage-first design for state persistence
+✓ Message passing for cross-context communication
+✓ Proper content script injection (https://github.com/*/*/pull/*)
+
+================================================================================
+SESSION MODEL
+================================================================================
+
+TrackingSession {
+  id: string              // localId: timestamp-random
+  tabId: number           // Chrome tab ID
+  repoOwner: string       // GitHub org/user
+  repoName: string        // Repository name
+  prNumber: number        // PR #
+  prTitle: string         // Display title
+  startTime: number       // ms timestamp
+  endTime?: number        // ms timestamp when ended
+  durationSeconds?: number // Calculated on end
+  active: boolean         // true=tracking, false=paused
+  lastActivityTime: number
+  lastUpdate?: number     // For pause/resume calculations
+  backendId?: string      // Assigned by server
+  synced: boolean         // true=sent to server
+}
+
+================================================================================
+UNRESOLVED QUESTIONS
+================================================================================
+
+1. Popup UI implementation (popup.ts not fully examined)
+2. API client auth token handling (apiClient.ts not examined)
+3. DailyStats schema (re-exported from @worktime/shared)
+4. Retry/backoff strategies beyond in-queue persistence
+5. Multiple simultaneous PR handling across tabs
+
+================================================================================

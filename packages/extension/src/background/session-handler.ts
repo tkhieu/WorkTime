@@ -97,29 +97,25 @@ export async function endSession(localId: string): Promise<void> {
   session.lastUpdate = now;
   await storageManager.saveSession(session);
 
-  // Queue sync action if we have a backend ID
-  if (session.backendId) {
-    const pendingSession: PendingSession = {
-      localId,
-      backendId: parseInt(session.backendId),
-      action: 'end',
-      data: {
-        repo_owner: session.repoOwner,
-        repo_name: session.repoName,
-        pr_number: session.prNumber,
-        duration_seconds: durationSeconds,
-      },
-      created_at: new Date().toISOString(),
-      synced: false,
-    };
-    pendingSessions.push(pendingSession);
-    await savePendingSessions();
+  // Always queue sync action (will create session first if no backendId)
+  const pendingSession: PendingSession = {
+    localId,
+    backendId: session.backendId ? parseInt(session.backendId) : undefined,
+    action: 'end',
+    data: {
+      repo_owner: session.repoOwner,
+      repo_name: session.repoName,
+      pr_number: session.prNumber,
+      duration_seconds: durationSeconds,
+    },
+    created_at: new Date().toISOString(),
+    synced: false,
+  };
+  pendingSessions.push(pendingSession);
+  await savePendingSessions();
 
-    // Attempt immediate sync
-    await trySyncSessions();
-  } else {
-    console.warn('[SessionHandler] No backend ID, cannot sync end');
-  }
+  // Attempt immediate sync
+  await trySyncSessions();
 }
 
 /**
@@ -220,14 +216,35 @@ export async function trySyncSessions(): Promise<void> {
           pending.synced = true;
           console.log('[SessionHandler] Session started on backend:', response.session_id);
 
-        } else if (pending.action === 'end' && pending.backendId) {
+        } else if (pending.action === 'end') {
+          let backendId = pending.backendId;
+
+          // If no backendId, create session first then end it
+          if (!backendId) {
+            console.log('[SessionHandler] No backendId, creating session first...');
+            const startResponse = await apiClient.startSession({
+              repo_owner: pending.data.repo_owner,
+              repo_name: pending.data.repo_name,
+              pr_number: pending.data.pr_number,
+            });
+            backendId = Number(startResponse.session_id);
+
+            // Update local session with backend ID
+            const session = await storageManager.getSession(pending.localId);
+            if (session) {
+              session.backendId = String(backendId);
+              await storageManager.saveSession(session);
+            }
+            console.log('[SessionHandler] Session created on backend:', backendId);
+          }
+
           // End session on backend
           await apiClient.endSession(
-            String(pending.backendId),
+            String(backendId),
             pending.data.duration_seconds || 0
           );
           pending.synced = true;
-          console.log('[SessionHandler] Session ended on backend:', pending.backendId);
+          console.log('[SessionHandler] Session ended on backend:', backendId);
         }
       } catch (error) {
         console.error('[SessionHandler] Failed to sync session:', pending.localId, error);

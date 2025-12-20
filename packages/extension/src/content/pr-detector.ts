@@ -3,11 +3,15 @@
 
 import { parseGitHubPRUrl } from '@worktime/shared';
 import { initActivityDetector } from './activity-detector';
+import { initUserActivityTracker, cleanupUserActivityTracker } from './user-activity-tracker';
 
 console.log('WorkTime PR Detector loaded');
 
 // Prevent duplicate visibility listener registration
 let visibilityTrackingInitialized = false;
+
+// Track if user activity tracker is initialized
+let userActivityInitialized = false;
 
 // Detect if current page is a GitHub PR
 function detectPR() {
@@ -23,6 +27,20 @@ function detectPR() {
 
     // Initialize visibility tracking for this PR
     initVisibilityTracking();
+
+    // Initialize user activity tracker for inactivity timeout
+    if (!userActivityInitialized) {
+      initUserActivityTracker();
+      userActivityInitialized = true;
+      console.log('[PRDetector] User activity tracker initialized');
+    }
+  } else {
+    // Cleanup when navigating away from PR
+    if (userActivityInitialized) {
+      cleanupUserActivityTracker();
+      userActivityInitialized = false;
+      console.log('[PRDetector] User activity tracker cleaned up');
+    }
   }
 }
 

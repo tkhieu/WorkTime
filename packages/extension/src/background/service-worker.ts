@@ -24,6 +24,7 @@ import {
   trySyncSessions,
 } from './session-handler';
 import { initSyncManager, handleSyncAlarm, forceSyncNow } from './sync-manager';
+import { initInactivityHandler, handleInactivityAlarm, updateSessionActivity } from './inactivity-handler';
 import type { MessageType } from '../types';
 
 // ======================================
@@ -40,6 +41,7 @@ chrome.idle.onStateChanged.addListener(handleIdleStateChange);
 chrome.alarms.onAlarm.addListener((alarm) => {
   alarmManager.handleAlarm(alarm);
   handleSyncAlarm(alarm);
+  handleInactivityAlarm(alarm);
 });
 
 // ======================================
@@ -75,6 +77,9 @@ async function initialize(): Promise<void> {
     // Initialize sync manager for periodic sync
     await initSyncManager();
 
+    // Initialize inactivity handler for auto-close
+    await initInactivityHandler();
+
     // Setup idle detection
     const settings = await storageManager.getSettings();
     chrome.idle.setDetectionInterval(settings.idleThreshold);
@@ -103,6 +108,16 @@ function handleMessage(
     handlePRDetected(message.data, message.tabId ?? -1).catch(console.error);
   } else if (message.type === 'PR_ACTIVITY_DETECTED') {
     handlePRActivityDetected(message.data).catch(console.error);
+  } else if (message.type === 'USER_ACTIVITY') {
+    const tabId = _sender.tab?.id;
+    if (tabId) {
+      updateSessionActivity(tabId).catch(console.error);
+    }
+  } else if (message.type === 'REVIEW_SUBMITTED') {
+    const tabId = _sender.tab?.id;
+    if (tabId) {
+      handleReviewSubmitted(tabId).catch(console.error);
+    }
   } else if (message.type === 'TAB_HIDDEN') {
     handleTabHidden(message.tabId ?? -1).catch(console.error);
   } else if (message.type === 'TAB_VISIBLE') {
@@ -359,6 +374,19 @@ async function getGitHubStatus(): Promise<unknown> {
     authenticated: authStatus.authenticated,
     user: authStatus.user,
   };
+}
+
+/**
+ * Handle review submission event
+ * Closes the session when user submits a review
+ */
+async function handleReviewSubmitted(tabId: number): Promise<void> {
+  const session = await getActiveSessionForTab(tabId);
+  if (session) {
+    console.log(`[ServiceWorker] Review submitted, closing session ${session.id}`);
+    await endSession(session.id);
+    await trySyncSessions();
+  }
 }
 
 // ======================================

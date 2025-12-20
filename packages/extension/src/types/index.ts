@@ -25,6 +25,8 @@ export interface StorageData {
 export type MessageTypeString =
   | 'PR_DETECTED'
   | 'PR_ACTIVITY_DETECTED'
+  | 'USER_ACTIVITY'
+  | 'REVIEW_SUBMITTED'
   | 'START_TRACKING'
   | 'STOP_TRACKING'
   | 'GET_ACTIVE_SESSION'

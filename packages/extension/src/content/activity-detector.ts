@@ -109,6 +109,13 @@ function sendActivity(activityType: PRReviewActivityType, metadata?: object): vo
     type: 'PR_ACTIVITY_DETECTED',
     data,
   });
+
+  // Close session when review is submitted (approval, request changes, or comment)
+  if (['approve', 'request_changes', 'comment'].includes(activityType)) {
+    chrome.runtime.sendMessage({ type: 'REVIEW_SUBMITTED' }).catch(() => {
+      // Ignore - service worker handles it
+    });
+  }
 }
 
 /**

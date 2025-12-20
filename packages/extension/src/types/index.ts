@@ -140,4 +140,8 @@ export interface PendingSession {
   };
   created_at: string;
   synced: boolean;
+  // Retry logic fields
+  retryCount?: number;
+  lastRetryTime?: number;
+  lastError?: string;
 }

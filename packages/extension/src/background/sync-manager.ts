@@ -8,7 +8,7 @@ import { trySyncActivities, loadActivityQueue } from './activity-handler';
 import { tokenManager } from '../auth/token-manager';
 
 const SYNC_ALARM_NAME = 'worktime-sync';
-const SYNC_INTERVAL_MINUTES = 5;
+const SYNC_INTERVAL_MINUTES = 1; // Reduced from 5 to 1 minute for faster sync
 
 /**
  * Initialize sync manager

@@ -6,6 +6,7 @@
 import { tokenManager } from '../auth/token-manager';
 import { storageManager } from './storage-manager';
 import { getAPIClient } from './api-client';
+import { shouldRetry, isReadyForRetry } from './sync-retry';
 import type { TrackingSession, PendingSession } from '../types';
 
 // In-memory queue for pending syncs
@@ -114,8 +115,73 @@ export async function endSession(localId: string): Promise<void> {
   pendingSessions.push(pendingSession);
   await savePendingSessions();
 
-  // Attempt immediate sync
-  await trySyncSessions();
+  // IMMEDIATE sync attempt (blocking) - ensures data reaches server before tab closes
+  await trySyncSessionImmediate(localId);
+}
+
+/**
+ * Immediate sync for specific session (blocking)
+ * Called on endSession to ensure data reaches server before tab closes
+ */
+async function trySyncSessionImmediate(targetLocalId: string): Promise<boolean> {
+  const isAuthenticated = await tokenManager.isAuthenticated();
+  if (!isAuthenticated) {
+    console.log('[SessionHandler] Not authenticated, skipping immediate sync');
+    return false;
+  }
+
+  const pending = pendingSessions.find(
+    (s) => s.localId === targetLocalId && !s.synced
+  );
+  if (!pending) return true; // Already synced
+
+  const apiClient = getAPIClient();
+
+  try {
+    // If no backendId and this is an 'end' action, create session first
+    if (!pending.backendId && pending.action === 'end') {
+      console.log('[SessionHandler] Immediate: Creating session first...');
+      const startResponse = await apiClient.startSession({
+        repo_owner: pending.data.repo_owner,
+        repo_name: pending.data.repo_name,
+        pr_number: pending.data.pr_number,
+      });
+      pending.backendId = Number(startResponse.session_id);
+
+      // Update local session with backendId
+      const session = await storageManager.getSession(targetLocalId);
+      if (session) {
+        session.backendId = String(startResponse.session_id);
+        await storageManager.saveSession(session);
+      }
+    }
+
+    // Now end the session on backend
+    if (pending.backendId) {
+      await apiClient.endSession(
+        String(pending.backendId),
+        pending.data.duration_seconds || 0
+      );
+      pending.synced = true;
+
+      // Remove from queue
+      pendingSessions = pendingSessions.filter(
+        (s) => !(s.localId === targetLocalId && s.synced)
+      );
+      await savePendingSessions();
+      console.log('[SessionHandler] Immediate sync success:', pending.backendId);
+      return true;
+    }
+  } catch (error) {
+    console.error('[SessionHandler] Immediate sync failed:', error);
+    // Update retry tracking for background retry
+    pending.retryCount = (pending.retryCount || 0) + 1;
+    pending.lastRetryTime = Date.now();
+    pending.lastError = error instanceof Error ? error.message : 'Unknown error';
+    await savePendingSessions();
+    // Will retry on next alarm
+  }
+  return false;
 }
 
 /**
@@ -172,7 +238,7 @@ export async function hasActiveSession(): Promise<boolean> {
 }
 
 /**
- * Try to sync pending sessions to backend
+ * Try to sync pending sessions to backend with retry logic
  */
 export async function trySyncSessions(): Promise<void> {
   if (syncInProgress) return;
@@ -188,13 +254,18 @@ export async function trySyncSessions(): Promise<void> {
   syncInProgress = true;
 
   try {
-    const unsyncedSessions = pendingSessions.filter(s => !s.synced);
+    const unsyncedSessions = pendingSessions.filter((s) => !s.synced);
     if (unsyncedSessions.length === 0) return;
 
     console.log('[SessionHandler] Syncing', unsyncedSessions.length, 'sessions');
     const apiClient = getAPIClient();
 
     for (const pending of unsyncedSessions) {
+      // Check if ready for retry based on backoff
+      if (!isReadyForRetry(pending.retryCount || 0, pending.lastRetryTime)) {
+        continue; // Skip, not time to retry yet
+      }
+
       try {
         if (pending.action === 'start') {
           // Create session on backend
@@ -215,7 +286,6 @@ export async function trySyncSessions(): Promise<void> {
           pending.backendId = Number(response.session_id);
           pending.synced = true;
           console.log('[SessionHandler] Session started on backend:', response.session_id);
-
         } else if (pending.action === 'end') {
           let backendId = pending.backendId;
 
@@ -248,18 +318,46 @@ export async function trySyncSessions(): Promise<void> {
         }
       } catch (error) {
         console.error('[SessionHandler] Failed to sync session:', pending.localId, error);
-        // Keep in queue for retry
+
+        // Update retry tracking
+        pending.retryCount = (pending.retryCount || 0) + 1;
+        pending.lastRetryTime = Date.now();
+        pending.lastError = error instanceof Error ? error.message : 'Unknown error';
+
+        // Check if should move to dead letter queue
+        if (!shouldRetry(pending.retryCount, error as Error)) {
+          console.warn('[SessionHandler] Max retries exceeded, moving to dead letter:', pending.localId);
+          await addToDeadLetterQueue(pending);
+          pending.synced = true; // Remove from active queue
+        }
       }
     }
 
     // Clean up synced sessions
-    pendingSessions = pendingSessions.filter(s => !s.synced);
+    pendingSessions = pendingSessions.filter((s) => !s.synced);
     await savePendingSessions();
 
     console.log('[SessionHandler] Sync complete');
   } finally {
     syncInProgress = false;
   }
+}
+
+/**
+ * Add failed item to dead letter queue for debugging
+ */
+const MAX_DEAD_LETTER_ITEMS = 50;
+
+async function addToDeadLetterQueue(item: PendingSession): Promise<void> {
+  const { deadLetterQueue = [] } = await chrome.storage.local.get('deadLetterQueue');
+  deadLetterQueue.push({
+    ...item,
+    failedAt: new Date().toISOString(),
+  });
+
+  // Keep only last N items (circular buffer)
+  const trimmed = deadLetterQueue.slice(-MAX_DEAD_LETTER_ITEMS);
+  await chrome.storage.local.set({ deadLetterQueue: trimmed });
 }
 
 /**

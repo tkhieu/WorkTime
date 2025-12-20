@@ -98,8 +98,20 @@ sessions.get('/', validatePagination, async (c) => {
       offset
     );
 
+    // Transform session_id to id for frontend compatibility
+    const transformedSessions = sessionList.map((s) => ({
+      id: s.session_id,
+      repo_owner: s.repo_owner,
+      repo_name: s.repo_name,
+      pr_number: s.pr_number,
+      start_time: s.start_time,
+      end_time: s.end_time,
+      duration_seconds: s.duration_seconds,
+      created_at: s.created_at,
+    }));
+
     return c.json({
-      sessions: sessionList,
+      sessions: transformedSessions,
       total,
       limit,
       offset,
@@ -131,7 +143,18 @@ sessions.get('/:id', async (c) => {
       throw errors.notFound('Session not found');
     }
 
-    return c.json(session, 200);
+    // Transform session_id to id for frontend compatibility
+    return c.json({
+      id: session.session_id,
+      repo_owner: session.repo_owner,
+      repo_name: session.repo_name,
+      pr_number: session.pr_number,
+      start_time: session.start_time,
+      end_time: session.end_time,
+      duration_seconds: session.duration_seconds,
+      status: session.status,
+      created_at: session.created_at,
+    }, 200);
 
   } catch (error) {
     if (error instanceof Error && error.name === 'APIError') {

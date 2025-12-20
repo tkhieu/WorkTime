@@ -49,7 +49,7 @@ export function Sessions() {
     end_date: end,
   });
 
-  const totalPages = data ? Math.ceil(data.pagination.total / ITEMS_PER_PAGE) : 1;
+  const totalPages = data?.total ? Math.ceil(data.total / ITEMS_PER_PAGE) : 1;
 
   // Reset to page 1 when filter changes
   const handleDateRangeChange = (range: DateRange) => {

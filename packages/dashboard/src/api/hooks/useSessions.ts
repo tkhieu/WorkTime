@@ -5,13 +5,14 @@ import type { SessionsResponse, SessionsQueryParams } from '../types';
 
 export function useSessions(params: SessionsQueryParams = {}) {
   const { page = 1, limit = 20, start_date, end_date } = params;
+  const offset = (page - 1) * limit;
 
   return useQuery({
     queryKey: queryKeys.sessions.list({ page, limit }),
     queryFn: async ({ signal }) => {
       return apiClient<SessionsResponse>('/api/sessions', {
         signal,
-        params: { page, limit, start_date, end_date },
+        params: { limit, offset, start_date, end_date },
       });
     },
     staleTime: 5 * 60 * 1000, // 5 minutes

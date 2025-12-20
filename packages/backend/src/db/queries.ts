@@ -165,6 +165,62 @@ export async function getDailyStats(
   return result.results || [];
 }
 
+export async function getWeeklyStats(
+  db: D1Database,
+  userId: number,
+  week: string // Format: YYYY-Www (e.g., 2025-W52)
+): Promise<{
+  week: string;
+  total_seconds: number;
+  session_count: number;
+  daily_breakdown: DailyStat[];
+}> {
+  // Parse week string to get start and end dates
+  const match = week.match(/^(\d{4})-W(\d{2})$/);
+  if (!match) {
+    return { week, total_seconds: 0, session_count: 0, daily_breakdown: [] };
+  }
+
+  const year = parseInt(match[1], 10);
+  const weekNum = parseInt(match[2], 10);
+
+  // Calculate the Monday of the given ISO week
+  const jan4 = new Date(year, 0, 4);
+  const dayOfWeek = jan4.getDay() || 7;
+  const mondayOfWeek1 = new Date(jan4);
+  mondayOfWeek1.setDate(jan4.getDate() - dayOfWeek + 1);
+
+  const startDate = new Date(mondayOfWeek1);
+  startDate.setDate(mondayOfWeek1.getDate() + (weekNum - 1) * 7);
+
+  const endDate = new Date(startDate);
+  endDate.setDate(startDate.getDate() + 6);
+
+  const startStr = startDate.toISOString().split('T')[0];
+  const endStr = endDate.toISOString().split('T')[0];
+
+  // Get daily stats for the week
+  const stmt = db.prepare(`
+    SELECT * FROM daily_stats
+    WHERE user_id = ? AND date >= ? AND date <= ?
+    ORDER BY date ASC
+  `);
+
+  const result = await stmt.bind(userId, startStr, endStr).all<DailyStat>();
+  const dailyBreakdown = result.results || [];
+
+  // Calculate totals
+  const totalSeconds = dailyBreakdown.reduce((sum, stat) => sum + stat.total_seconds, 0);
+  const sessionCount = dailyBreakdown.reduce((sum, stat) => sum + stat.session_count, 0);
+
+  return {
+    week,
+    total_seconds: totalSeconds,
+    session_count: sessionCount,
+    daily_breakdown: dailyBreakdown,
+  };
+}
+
 export async function getRepoStats(
   db: D1Database,
   userId: number,

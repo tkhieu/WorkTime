@@ -2,7 +2,7 @@ import { Hono } from 'hono';
 import { Env } from '../types';
 import { authMiddleware } from '../middleware/auth';
 import { validateDaysQuery } from '../middleware/validation';
-import { getDailyStats, getRepoStats } from '../db/queries';
+import { getDailyStats, getWeeklyStats, getRepoStats } from '../db/queries';
 import { errors } from '../utils/errors';
 
 const stats = new Hono<{ Bindings: Env }>();
@@ -32,6 +32,36 @@ stats.get('/daily', validateDaysQuery, async (c) => {
   } catch (error) {
     console.error('Daily stats error:', error);
     throw errors.internal('Failed to fetch daily stats');
+  }
+});
+
+/**
+ * Get weekly stats for the user
+ * GET /api/stats/weekly?week=2025-W52
+ */
+stats.get('/weekly', async (c) => {
+  const userId = c.get('userId');
+  const week = c.req.query('week');
+
+  if (!week) {
+    throw errors.badRequest('Week parameter is required (format: YYYY-Www)');
+  }
+
+  // Validate week format
+  if (!/^\d{4}-W\d{2}$/.test(week)) {
+    throw errors.badRequest('Invalid week format. Use YYYY-Www (e.g., 2025-W52)');
+  }
+
+  try {
+    const weeklyStats = await getWeeklyStats(c.env.DB, userId, week);
+
+    return c.json(weeklyStats, 200, {
+      'Cache-Control': 'public, max-age=300' // Cache for 5 minutes
+    });
+
+  } catch (error) {
+    console.error('Weekly stats error:', error);
+    throw errors.internal('Failed to fetch weekly stats');
   }
 });
 

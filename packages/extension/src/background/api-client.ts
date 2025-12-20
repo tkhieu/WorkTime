@@ -154,14 +154,21 @@ export class WorkTimeAPI {
         );
       }
 
-      const data: APIResponse<T> = await response.json();
-      if (!data.success || !data.data) {
-        throw new WorkTimeAPIError(
-          data.error?.message || 'Invalid API response'
-        );
+      const data = await response.json();
+
+      // Handle both wrapped { success, data } and raw response formats
+      if ('success' in data && typeof data.success === 'boolean') {
+        // Wrapped format: { success: boolean, data?: T, error?: APIError }
+        if (!data.success || !data.data) {
+          throw new WorkTimeAPIError(
+            data.error?.message || 'Invalid API response'
+          );
+        }
+        return data.data as T;
       }
 
-      return data.data;
+      // Raw response format - return as-is
+      return data as T;
     } catch (error) {
       clearTimeout(timeoutId);
 

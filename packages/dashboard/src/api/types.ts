@@ -12,11 +12,10 @@ export interface Session {
 
 export interface SessionsResponse {
   sessions: Session[];
-  pagination: {
-    page: number;
-    limit: number;
-    total: number;
-  };
+  total: number;
+  limit: number;
+  offset: number;
+  has_more: boolean;
 }
 
 // Stats types

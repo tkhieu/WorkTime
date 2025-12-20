@@ -21,6 +21,11 @@ export const corsMiddleware = cors({
       return origin;
     }
 
+    // Allow dashboard production (Cloudflare Pages)
+    if (origin.endsWith('.pages.dev')) {
+      return origin;
+    }
+
     // Reject all other origins
     return '';
   },

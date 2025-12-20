@@ -1,0 +1,147 @@
+╔════════════════════════════════════════════════════════════════════════╗
+║          QUEEN COORDINATOR: GITHUB AUTH EXECUTION PLAN                 ║
+║                    Status: READY FOR EXECUTION                         ║
+╚════════════════════════════════════════════════════════════════════════╝
+
+┌────────────────────────────────────────────────────────────────────────┐
+│ PHASE DEPENDENCY GRAPH                                                 │
+└────────────────────────────────────────────────────────────────────────┘
+
+    Phase 1: Backend OAuth Review (FOUNDATION)
+        ↓
+        ├─→ Phase 2: Auth Context ──┐
+        │                            ├─→ Phase 4: Protected Routes ─┐
+        └─→ Phase 3: Login Page ────┘                               │
+                                                                     ├─→ Phase 6: Logout
+                     Phase 5: API Auth Integration ─────────────────┘
+
+
+┌────────────────────────────────────────────────────────────────────────┐
+│ EXECUTION BATCHES (Optimized for Parallelization)                     │
+└────────────────────────────────────────────────────────────────────────┘
+
+┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+┃ BATCH 1: Backend Foundation (Sequential) - 1 hour                   ┃
+┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛
+│ Worker Type    │ Task                                  │ Time      │
+├────────────────┼───────────────────────────────────────┼───────────┤
+│ backend-dev    │ Verify PKCE support in auth routes   │ 30 min    │
+│ coder          │ Update CORS for .pages.dev origins   │ 15 min    │
+│ reviewer       │ Verify env vars + GitHub OAuth App   │ 15 min    │
+└────────────────┴───────────────────────────────────────┴───────────┘
+GATE: CORS configured + env vars verified ✓
+
+┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+┃ BATCH 2: Frontend Auth Core (Parallel) - 2-2.5 hours                ┃
+┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛
+│ Worker Type    │ Task                                  │ Time      │
+├────────────────┼───────────────────────────────────────┼───────────┤
+│ coder          │ Create AuthContext + PKCE helpers     │ 1.5 hours │ ║
+│ coder          │ Create Login + AuthCallback pages    │ 1.5 hours │ ║ PARALLEL
+│ tester         │ Unit tests for auth flow              │ 1 hour    │ ║
+└────────────────┴───────────────────────────────────────┴───────────┘
+GATE: useAuth() functional + OAuth redirect working ✓
+
+┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+┃ BATCH 3: Routing & API Integration (Parallel) - 2 hours             ┃
+┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛
+│ Worker Type    │ Task                                  │ Time      │
+├────────────────┼───────────────────────────────────────┼───────────┤
+│ coder          │ ProtectedRoute + route config         │ 1 hour    │ ║
+│ coder          │ API client + token refresh            │ 1.5 hours │ ║ PARALLEL
+│ tester         │ Route guard + API interceptor tests   │ 1 hour    │ ║
+└────────────────┴───────────────────────────────────────┴───────────┘
+GATE: Protected routes working + API auth functional ✓
+
+┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+┃ BATCH 4: Logout & Session Polish (Sequential) - 2-2.5 hours         ┃
+┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛
+│ Worker Type    │ Task                                  │ Time      │
+├────────────────┼───────────────────────────────────────┼───────────┤
+│ coder          │ Navbar/Sidebar logout + session modal │ 1.5 hours │
+│ reviewer       │ End-to-end security + UX review       │ 30 min    │
+│ tester         │ Complete auth lifecycle tests         │ 1 hour    │
+└────────────────┴───────────────────────────────────────┴───────────┘
+GATE: Complete login-to-logout flow validated ✓
+
+
+┌────────────────────────────────────────────────────────────────────────┐
+│ TIMELINE COMPARISON                                                    │
+└────────────────────────────────────────────────────────────────────────┘
+
+Sequential Approach:   ████████████████████████████████ 12+ hours
+Optimized (Parallel):  ████████████████████ 7.5-9 hours
+Original Estimate:     ██████████████████████ 6-9 hours
+
+Parallelization Benefit: ~40% time reduction
+
+
+┌────────────────────────────────────────────────────────────────────────┐
+│ RESOURCE ALLOCATION                                                    │
+└────────────────────────────────────────────────────────────────────────┘
+
+Total Workers: 11 agents
+Max Concurrent: 3 workers (Batch 2 or Batch 3)
+
+Worker Types:
+  • backend-dev:  1 agent  (Batch 1)
+  • coder:        5 agents (Batches 1, 2, 3, 4)
+  • tester:       3 agents (Batches 2, 3, 4)
+  • reviewer:     2 agents (Batches 1, 4)
+
+
+┌────────────────────────────────────────────────────────────────────────┐
+│ SUCCESS CRITERIA                                                       │
+└────────────────────────────────────────────────────────────────────────┘
+
+Functional:
+  ✓ Users can login via GitHub OAuth
+  ✓ API calls include Authorization header
+  ✓ 401 responses redirect to /login
+  ✓ Token auto-refresh before expiry
+  ✓ Logout clears state and redirects
+  ✓ Session expired modal functional
+
+Quality:
+  ✓ All unit tests passing
+  ✓ All integration tests passing
+  ✓ CORS properly configured
+  ✓ Comprehensive error handling
+  ✓ Security review complete
+  ✓ Smooth UX (no content flashing)
+
+
+┌────────────────────────────────────────────────────────────────────────┐
+│ PREREQUISITES (MUST BE READY BEFORE EXECUTION)                         │
+└────────────────────────────────────────────────────────────────────────┘
+
+Backend Environment:
+  • GITHUB_CLIENT_ID configured in wrangler.toml
+  • GITHUB_CLIENT_SECRET configured (secret)
+  • JWT_SECRET configured (secret)
+
+GitHub OAuth App:
+  • Development callback: http://localhost:5173/auth/callback
+  • Production callback: https://<dashboard>.pages.dev/auth/callback
+
+CORS Configuration:
+  • Must be updated to allow .pages.dev domains
+
+
+┌────────────────────────────────────────────────────────────────────────┐
+│ EXECUTION READINESS                                                    │
+└────────────────────────────────────────────────────────────────────────┘
+
+Queen Status:     ✓ READY TO COORDINATE SWARM
+Blockers:         None identified
+Risk Level:       Low
+Success Probability: 95%
+
+Next Action:      Await execution command to spawn worker agents
+Coordination:     Hierarchical with batch-based dependency gates
+
+
+╔════════════════════════════════════════════════════════════════════════╗
+║  Full coordination plan:                                               ║
+║  → plans/reports/queen-coordination-github-auth-251220.md              ║
+╚════════════════════════════════════════════════════════════════════════╝
